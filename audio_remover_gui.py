@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, Listbox, MULTIPLE, ttk
 import os
 
+
 def get_audio_tracks(file_path):
     result = subprocess.run(
         ['ffprobe', '-v', 'error', '-select_streams', 'a',
@@ -34,6 +35,7 @@ def get_audio_tracks(file_path):
 
     return tracks
 
+
 def select_files():
     file_paths = filedialog.askopenfilenames(title="Select Video Files", filetypes=[("Video Files", "*.mkv *.mp4 *.mov *.avi")])
     if file_paths:
@@ -46,11 +48,20 @@ def select_files():
         current_tracks = tracks
         for _, label in tracks:
             audio_listbox.insert(tk.END, label)
+
+        if len(file_paths) == 1:
+            file_path_var.set(file_paths[0])
+        else:
+            file_path_var.set(f"{file_paths[0]} (+{len(file_paths) - 1} more)")
+
+        status_var.set(f"Ready - {len(tracks)} audio track(s) loaded")
         messagebox.showinfo("Select Tracks", "Select the tracks you want to REMOVE from all selected files.")
+
 
 def process_files():
     selected = audio_listbox.curselection()
     if not selected_files or not selected:
+        status_var.set("Error - select files and audio tracks")
         messagebox.showerror("Error", "Please select video files and audio tracks to remove.")
         return
 
@@ -58,12 +69,17 @@ def process_files():
     remove_indexes = [index for index, label in current_tracks if label in selected_labels]
 
     if len(current_tracks) == len(remove_indexes):
+        status_var.set("Error - at least one track must remain")
         messagebox.showerror("Error", "You must keep at least one audio track.")
         return
 
     save_dir = filedialog.askdirectory(title="Select Output Folder")
     if not save_dir:
+        status_var.set("Ready")
         return
+
+    status_var.set("Processing files...")
+    root.update_idletasks()
 
     for file_path in selected_files:
         base = os.path.basename(file_path)
@@ -74,6 +90,7 @@ def process_files():
         keep_tracks = [f"0:{index}" for index, label in tracks if index not in remove_indexes]
 
         if not keep_tracks:
+            status_var.set(f"Skipped {base} - no tracks left to keep")
             messagebox.showwarning("Skipped", f"Skipped {base}: no tracks left to keep.")
             continue
 
@@ -86,51 +103,207 @@ def process_files():
         result = subprocess.run(command, capture_output=True, text=True)
 
         if result.returncode != 0:
+            status_var.set(f"Error processing {base}")
             messagebox.showerror("FFmpeg Error", f"Error processing {base}:\n\n{result.stderr}")
             return
 
+    status_var.set("Done - files processed successfully")
     messagebox.showinfo("Success", f"All files processed successfully!\nSaved in:\n{save_dir}")
+
+
+def center_window(window, width=760, height=520):
+    window.update_idletasks()
+    screen_width = window.winfo_screenwidth()
+    screen_height = window.winfo_screenheight()
+    x = (screen_width - width) // 2
+    y = (screen_height - height) // 2
+    window.geometry(f"{width}x{height}+{x}+{y}")
+
 
 # GUI setup
 root = tk.Tk()
-root.title("🎧 Audio Track Remover Tool")
-root.geometry("550x470")  # Slightly taller to fit creator label
-root.configure(bg="#1e1e1e")
+root.title("Audio Track Remover")
+root.minsize(600, 400)
+root.configure(bg="#f5f5f5")
+center_window(root)
 
 style = ttk.Style()
-style.theme_use("default")
-style.configure("TButton", background="#007acc", foreground="white",
-                font=("Segoe UI", 10, "bold"), padding=6)
-style.configure("TLabel", background="#1e1e1e", foreground="white",
-                font=("Segoe UI", 12))
-style.configure("TListbox", background="#2d2d2d", foreground="white",
-                font=("Segoe UI", 10))
+style.theme_use("clam")
 
-# Title
-title_label = ttk.Label(root, text="🎧 Batch Audio Track Remover", font=("Segoe UI", 16, "bold"))
-title_label.pack(pady=(15, 0))
+style.configure("App.TFrame", background="#f5f5f5")
+style.configure(
+    "Card.TFrame",
+    background="#ffffff",
+    relief="solid",
+    borderwidth=1
+)
+style.configure(
+    "Title.TLabel",
+    background="#f5f5f5",
+    foreground="#1f1f1f",
+    font=("Segoe UI", 16, "bold")
+)
+style.configure(
+    "Subtitle.TLabel",
+    background="#f5f5f5",
+    foreground="#6b7280",
+    font=("Segoe UI", 9)
+)
+style.configure(
+    "Section.TLabel",
+    background="#ffffff",
+    foreground="#1f1f1f",
+    font=("Segoe UI", 10, "bold")
+)
+style.configure(
+    "Body.TLabel",
+    background="#ffffff",
+    foreground="#4b5563",
+    font=("Segoe UI", 9)
+)
+style.configure(
+    "Status.TLabel",
+    background="#ffffff",
+    foreground="#4b5563",
+    font=("Segoe UI", 9),
+    padding=(10, 8)
+)
+style.configure(
+    "TEntry",
+    fieldbackground="#ffffff",
+    foreground="#1f1f1f",
+    bordercolor="#d1d5db",
+    lightcolor="#d1d5db",
+    darkcolor="#d1d5db",
+    padding=8
+)
+style.configure(
+    "TButton",
+    font=("Segoe UI", 10),
+    padding=(14, 8),
+    background="#ffffff",
+    foreground="#1f1f1f",
+    bordercolor="#d1d5db",
+    lightcolor="#d1d5db",
+    darkcolor="#d1d5db"
+)
+style.map(
+    "TButton",
+    background=[("active", "#f0f0f0"), ("pressed", "#e5e7eb")]
+)
+style.configure(
+    "Primary.TButton",
+    font=("Segoe UI", 10, "bold"),
+    background="#e5e7eb",
+    foreground="#111827",
+    bordercolor="#c7ccd4",
+    lightcolor="#c7ccd4",
+    darkcolor="#c7ccd4"
+)
+style.map(
+    "Primary.TButton",
+    background=[("active", "#d9dde3"), ("pressed", "#cfd4db")]
+)
+style.configure(
+    "Vertical.TScrollbar",
+    background="#e5e7eb",
+    troughcolor="#f3f4f6",
+    bordercolor="#e5e7eb",
+    arrowcolor="#6b7280"
+)
 
-# Creator label
-creator_label = ttk.Label(root, text="Created by Akhilesh", font=("Segoe UI", 10), foreground="#cccccc", background="#1e1e1e")
-creator_label.pack(pady=(0, 15))
+main_frame = ttk.Frame(root, style="App.TFrame", padding=16)
+main_frame.grid(row=0, column=0, sticky="nsew")
+root.grid_rowconfigure(0, weight=1)
+root.grid_columnconfigure(0, weight=1)
 
-# File Selection Button
-ttk.Button(root, text="Select Video Files", command=select_files).pack(pady=10)
+main_frame.grid_rowconfigure(2, weight=1)
+main_frame.grid_columnconfigure(0, weight=1)
 
-# Listbox with Scrollbar
-frame = tk.Frame(root, bg="#1e1e1e")
-frame.pack(pady=5)
-scrollbar = tk.Scrollbar(frame)
-scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+header_frame = ttk.Frame(main_frame, style="App.TFrame")
+header_frame.grid(row=0, column=0, sticky="ew", pady=(0, 12))
+header_frame.grid_columnconfigure(0, weight=1)
 
-audio_listbox = Listbox(frame, selectmode=MULTIPLE, width=60, height=12,
-                        bg="#2d2d2d", fg="white", selectbackground="#444",
-                        font=("Segoe UI", 10), yscrollcommand=scrollbar.set)
-audio_listbox.pack(side=tk.LEFT)
-scrollbar.config(command=audio_listbox.yview)
+title_label = ttk.Label(header_frame, text="Audio Track Remover", style="Title.TLabel")
+title_label.grid(row=0, column=0, sticky="w")
 
-# Process Button
-ttk.Button(root, text="Remove Selected Tracks from All Files", command=process_files).pack(pady=15)
+creator_label = ttk.Label(header_frame, text="Created by Akhilesh", style="Subtitle.TLabel")
+creator_label.grid(row=1, column=0, sticky="w", pady=(4, 0))
+
+file_frame = ttk.Frame(main_frame, style="Card.TFrame", padding=14)
+file_frame.grid(row=1, column=0, sticky="ew", pady=(0, 12))
+file_frame.grid_columnconfigure(0, weight=1)
+
+ttk.Label(file_frame, text="Select Video File", style="Section.TLabel").grid(
+    row=0, column=0, columnspan=2, sticky="w", pady=(0, 8)
+)
+
+file_path_var = tk.StringVar(value="No files selected")
+file_entry = ttk.Entry(file_frame, textvariable=file_path_var, state="readonly")
+file_entry.grid(row=1, column=0, sticky="ew", padx=(0, 10))
+
+browse_button = ttk.Button(file_frame, text="Browse", command=select_files)
+browse_button.grid(row=1, column=1, sticky="e")
+
+tracks_frame = ttk.Frame(main_frame, style="Card.TFrame", padding=14)
+tracks_frame.grid(row=2, column=0, sticky="nsew", pady=(0, 12))
+tracks_frame.grid_rowconfigure(2, weight=1)
+tracks_frame.grid_columnconfigure(0, weight=1)
+
+ttk.Label(tracks_frame, text="Available Audio Tracks", style="Section.TLabel").grid(
+    row=0, column=0, sticky="w"
+)
+
+ttk.Label(
+    tracks_frame,
+    text="Select one or more tracks to remove from every chosen video.",
+    style="Body.TLabel"
+).grid(row=1, column=0, sticky="w", pady=(4, 10))
+
+listbox_container = tk.Frame(tracks_frame, bg="#d1d5db", bd=0, highlightthickness=0)
+listbox_container.grid(row=2, column=0, sticky="nsew")
+listbox_container.grid_rowconfigure(0, weight=1)
+listbox_container.grid_columnconfigure(0, weight=1)
+
+audio_listbox = Listbox(
+    listbox_container,
+    selectmode=MULTIPLE,
+    width=60,
+    height=12,
+    bg="#ffffff",
+    fg="#1f1f1f",
+    selectbackground="#dbe4f0",
+    selectforeground="#111827",
+    highlightthickness=0,
+    relief="flat",
+    bd=0,
+    font=("Segoe UI", 10)
+)
+audio_listbox.grid(row=0, column=0, sticky="nsew", padx=(1, 0), pady=1)
+
+scrollbar = ttk.Scrollbar(listbox_container, orient="vertical", command=audio_listbox.yview)
+scrollbar.grid(row=0, column=1, sticky="ns", padx=(0, 1), pady=1)
+audio_listbox.config(yscrollcommand=scrollbar.set)
+
+action_frame = ttk.Frame(main_frame, style="App.TFrame")
+action_frame.grid(row=3, column=0, sticky="ew", pady=(0, 12))
+action_frame.grid_columnconfigure(0, weight=1)
+
+process_button = ttk.Button(
+    action_frame,
+    text="Process Video",
+    command=process_files,
+    style="Primary.TButton"
+)
+process_button.grid(row=0, column=1, sticky="e")
+
+status_var = tk.StringVar(value="Ready")
+status_frame = ttk.Frame(main_frame, style="Card.TFrame")
+status_frame.grid(row=4, column=0, sticky="ew")
+status_frame.grid_columnconfigure(0, weight=1)
+
+status_label = ttk.Label(status_frame, textvariable=status_var, style="Status.TLabel", anchor="w")
+status_label.grid(row=0, column=0, sticky="ew")
 
 # Globals
 selected_files = []
