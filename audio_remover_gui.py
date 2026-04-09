@@ -2,11 +2,49 @@ import subprocess
 import tkinter as tk
 from tkinter import filedialog, messagebox, Listbox, MULTIPLE, ttk
 import os
+import shutil
+
+
+def resolve_tool(tool_name):
+    candidates = [
+        shutil.which(tool_name),
+        shutil.which(f"{tool_name}.exe"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), tool_name),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), f"{tool_name}.exe"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "ffmpeg", "bin", f"{tool_name}.exe"),
+    ]
+
+    for candidate in candidates:
+        if candidate and os.path.exists(candidate):
+            return candidate
+
+    return None
+
+
+def tools_ready():
+    missing_tools = []
+    if not FFPROBE_PATH:
+        missing_tools.append("ffprobe")
+    if not FFMPEG_PATH:
+        missing_tools.append("ffmpeg")
+
+    if missing_tools:
+        status_var.set(f"Missing dependency: {', '.join(missing_tools)}")
+        messagebox.showerror(
+            "Missing FFmpeg Tools",
+            "Required tool(s) not found: "
+            f"{', '.join(missing_tools)}.\n\n"
+            "Install FFmpeg and ensure both ffmpeg and ffprobe are available in PATH,\n"
+            "or place ffmpeg.exe and ffprobe.exe in the same folder as this script."
+        )
+        return False
+
+    return True
 
 
 def get_audio_tracks(file_path):
     result = subprocess.run(
-        ['ffprobe', '-v', 'error', '-select_streams', 'a',
+        [FFPROBE_PATH, '-v', 'error', '-select_streams', 'a',
          '-show_entries', 'stream=index:stream_tags=language,title',
          '-of', 'default=noprint_wrappers=1', file_path],
         capture_output=True, text=True
@@ -37,6 +75,9 @@ def get_audio_tracks(file_path):
 
 
 def select_files():
+    if not tools_ready():
+        return
+
     file_paths = filedialog.askopenfilenames(title="Select Video Files", filetypes=[("Video Files", "*.mkv *.mp4 *.mov *.avi")])
     if file_paths:
         audio_listbox.delete(0, tk.END)
@@ -59,6 +100,9 @@ def select_files():
 
 
 def process_files():
+    if not tools_ready():
+        return
+
     selected = audio_listbox.curselection()
     if not selected_files or not selected:
         status_var.set("Error - select files and audio tracks")
@@ -94,7 +138,7 @@ def process_files():
             messagebox.showwarning("Skipped", f"Skipped {base}: no tracks left to keep.")
             continue
 
-        command = ['ffmpeg', '-y', '-i', file_path, '-map', '0:v']
+        command = [FFMPEG_PATH, '-y', '-i', file_path, '-map', '0:v']
         for track in keep_tracks:
             command += ['-map', track]
         command += ['-c', 'copy', output_file]
@@ -121,6 +165,9 @@ def center_window(window, width=760, height=520):
 
 
 # GUI setup
+FFPROBE_PATH = resolve_tool("ffprobe")
+FFMPEG_PATH = resolve_tool("ffmpeg")
+
 root = tk.Tk()
 root.title("Audio Track Remover")
 root.minsize(600, 400)
@@ -297,7 +344,8 @@ process_button = ttk.Button(
 )
 process_button.grid(row=0, column=1, sticky="e")
 
-status_var = tk.StringVar(value="Ready")
+initial_status = "Ready" if FFPROBE_PATH and FFMPEG_PATH else "Missing dependency: ffmpeg / ffprobe"
+status_var = tk.StringVar(value=initial_status)
 status_frame = ttk.Frame(main_frame, style="Card.TFrame")
 status_frame.grid(row=4, column=0, sticky="ew")
 status_frame.grid_columnconfigure(0, weight=1)
