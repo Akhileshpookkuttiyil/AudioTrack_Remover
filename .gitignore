@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+ffmpeg.exe
+ffprobe.exe
+ffmpeg-release-essentials/
+ffmpeg-release-essentials.zip
+sample_input.mkv
+sample_output.mkv
